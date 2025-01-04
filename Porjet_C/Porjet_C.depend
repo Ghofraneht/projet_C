@@ -1,0 +1,14 @@
+# depslib dependency file v1.0
+1736017294 source:c:\users\ghajt\downloads\docteur-management-system-master\docteur-management-system-master\porjet_c\main.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<ctype.h>
+
+1733223171 c:\users\ghajt\downloads\docteur-management-system-master\docteur-management-system-master\porjet_c\patient.h
+
+1733223183 source:c:\users\ghajt\downloads\docteur-management-system-master\docteur-management-system-master\porjet_c\patient.c
+	"patient.h"
+	<stdio.h>
+	<string.h>
+
