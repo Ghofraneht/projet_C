@@ -1,0 +1,1374 @@
+#include <stdio.h>
+
+#include <stdlib.h>
+
+#include <string.h>
+
+#include <ctype.h>
+
+// Structures
+
+typedef struct {
+
+int ID;
+
+char nom[50];
+
+char specialite[50];
+
+char adresse[100];
+
+char numero_telephone[20];
+
+} Docteur;
+
+
+
+typedef struct {
+
+int ID;
+
+char nom[50];
+
+int age;
+
+char adresse[100];
+
+char numero_telephone[20];
+
+} Patient;
+
+
+
+typedef struct RendezVous {
+
+int id;
+
+Patient patient;
+
+Docteur docteur;
+
+char date[11]; // Format YYYY-MM-DD
+
+char heure[6]; // Format HH:MM
+
+struct RendezVous *next;
+
+} RendezVous;
+
+
+
+// Fonctions utilitaires pour valider les entrées
+
+int valider_id() {
+
+int id;
+
+printf("Saisir l'ID : ");
+
+scanf("%d", &id);
+
+getchar();
+
+while (id <= 0) {
+
+printf("ID invalide. Veuillez entrer un entier positif : ");
+
+scanf("%d", &id);
+
+getchar();
+
+}
+
+return id;
+
+}
+
+
+
+void valider_numero(char *numero) {
+
+int valide = 0;
+
+while (!valide) {
+
+printf("Saisir le numéro de téléphone : ");
+
+fgets(numero, 20, stdin);
+
+numero[strcspn(numero, "\n")] = '\0';
+
+
+
+valide = 1;
+
+for (int i = 0; numero[i] != '\0'; i++) {
+
+if (!isdigit(numero[i])) {
+
+valide = 0;
+
+printf("Le numéro doit contenir uniquement des chiffres.\n");
+
+break;
+
+}
+
+}
+
+}
+
+}
+
+int valider_date(char *date) {
+
+if (strlen(date) != 10 || date[4] != '-' || date[7] != '-')
+
+return 0;
+
+for (int i = 0; i < 10; i++) {
+
+if (i != 4 && i != 7 && !isdigit(date[i]))
+
+return 0;
+
+}
+
+return 1;
+
+}
+
+
+
+int valider_heure(char *heure) {
+
+if (strlen(heure) != 5 || heure[2] != ':')
+
+return 0;
+
+for (int i = 0; i < 5; i++) {
+
+if (i != 2 && !isdigit(heure[i]))
+
+return 0;
+
+}
+
+return 1;
+
+}
+
+void Charger_docteurs(Docteur **docteurs, int *total, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier docteurs");
+        return;
+    }
+
+    while (!feof(file)) {
+        *docteurs = realloc(*docteurs, (*total + 1) * sizeof(Docteur));
+        if (*docteurs == NULL) {
+            perror("Erreur d'allocation mémoire pour les docteurs");
+            fclose(file);
+            return;
+        }
+
+        Docteur *nouveau = &(*docteurs)[*total];
+        if (fscanf(file, "%d;%49[^;];%49[^;];%99[^;];%19[^\n]\n",
+                   &nouveau->ID, nouveau->nom, nouveau->specialite, nouveau->adresse, nouveau->numero_telephone) != 5) {
+            printf("Erreur de format dans le fichier docteurs\n");
+            fclose(file);
+            free(*docteurs);
+            *docteurs = NULL;
+            *total = 0;
+            return;
+        }
+        (*total)++;
+    }
+
+    fclose(file);
+}
+
+void Charger_patients(Patient **patients, int *total, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier patients");
+        return;
+    }
+
+    while (!feof(file)) {
+        *patients = realloc(*patients, (*total + 1) * sizeof(Patient));
+        if (*patients == NULL) {
+            perror("Erreur d'allocation mémoire pour les patients");
+            fclose(file);
+            return;
+        }
+
+        Patient *nouveau = &(*patients)[*total];
+        if (fscanf(file, "%d;%49[^;];%d;%99[^;];%19[^\n]\n",
+                   &nouveau->ID, nouveau->nom, &nouveau->age, nouveau->adresse, nouveau->numero_telephone) != 5) {
+            printf("Erreur de format dans le fichier patients\n");
+            fclose(file);
+            free(*patients);
+            *patients = NULL;
+            *total = 0;
+            return;
+        }
+        (*total)++;
+    }
+
+    fclose(file);
+}
+
+void Charger_rendezVous(RendezVous **rendezVous, int *total, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier rendez-vous");
+        return;
+    }
+
+    while (!feof(file)) {
+        *rendezVous = realloc(*rendezVous, (*total + 1) * sizeof(RendezVous));
+        if (*rendezVous == NULL) {
+            perror("Erreur d'allocation mémoire pour les rendez-vous");
+            fclose(file);
+            return;
+        }
+
+        RendezVous *nouveau = &(*rendezVous)[*total];
+        // Adaptez le format de lecture en fonction de votre structure RendezVous
+        if (fscanf(file, "%d;%d;%d;%19[^;];%9[^\n]\n",
+                   &nouveau->id, &nouveau->patient.ID, &nouveau->docteur.ID, nouveau->date, nouveau->heure) != 5) {
+            printf("Erreur de format dans le fichier rendez-vous\n");
+            fclose(file);
+            // Libérer la mémoire allouée pour les rendez-vous
+            RendezVous *temp;
+            while (*rendezVous) {
+                temp = *rendezVous;
+                *rendezVous = (*rendezVous)->next;
+                free(temp);
+            }
+            *rendezVous = NULL;
+            *total = 0;
+            return;
+        }
+        (*total)++;
+    }
+
+    fclose(file);
+}
+
+// Fonctions de sauvegarde
+
+void Sauvegarder_docteurs(Docteur *docteurs, int total) {
+
+FILE *file = fopen("docteur.txt", "a");
+
+if (!file) {
+
+printf("Impossible d'ouvrir le fichier pour sauvegarder les docteurs.\n");
+
+return;
+
+}
+
+for (int i = 0; i < total; i++) {
+
+fprintf(file, "%d;%s;%s;%s;%s\n", docteurs[i].ID, docteurs[i].nom, docteurs[i].specialite, docteurs[i].adresse, docteurs[i].numero_telephone);
+
+}
+
+fflush(file); // Force l'écriture des données dans le fichier
+
+
+
+fclose(file);
+
+printf("Les docteurs ont été sauvegardés avec succès.\n");
+
+}
+
+
+
+void Sauvegarder_patients(Patient *patients, int total) {
+
+FILE *file = fopen("patient.txt", "a");
+
+if (!file) {
+
+printf("Impossible d'ouvrir le fichier pour sauvegarder les patients.\n");
+
+return;
+
+}
+
+for (int i = 0; i < total; i++) {
+
+fprintf(file, "%d;%s;%d;%s;%s\n", patients[i].ID, patients[i].nom, patients[i].age, patients[i].adresse, patients[i].numero_telephone);
+
+}
+
+fflush(file); // Force l'écriture des données dans le fichier
+
+
+
+fclose(file);
+
+printf("Les patients ont été sauvegardés avec succès.\n");
+
+}
+
+
+
+void Sauvegarder_rendezvous(RendezVous *rendezVous) {
+
+FILE *file = fopen("rendezvous.txt", "a");
+
+if (!file) {
+
+printf("Impossible d'ouvrir le fichier pour sauvegarder les rendez-vous.\n");
+
+return;
+
+}
+
+RendezVous *temp = rendezVous;
+
+while (temp != NULL) {
+
+fprintf(file, "%d;%d;%s;%s;%s;%s\n", temp->id, temp->patient.ID, temp->patient.nom, temp->docteur.nom, temp->date, temp->heure);
+
+temp = temp->next;
+
+}
+
+fflush(file); // Force l'écriture des données dans le fichier
+
+
+
+fclose(file);
+
+printf("Les rendez-vous ont été sauvegardés avec succès.\n");
+
+}
+
+
+
+// Fonctions CRUD pour les docteurs
+
+
+
+void Ajouter_docteur(Docteur **docteurs, int *total) {
+
+int nouvel_ID;
+
+int id_existe = 0;
+
+
+
+do {
+
+id_existe = 0; // Réinitialisation pour chaque tentative
+
+nouvel_ID = valider_id(); // Demander un ID valide
+
+
+
+// Vérifier si l'ID existe déjà
+
+for (int i = 0; i < *total; i++) {
+
+if ((*docteurs)[i].ID == nouvel_ID) {
+
+id_existe = 1;
+
+printf("Cet ID existe déjà. Veuillez saisir un ID unique.\n");
+
+break;
+
+}
+
+}
+
+} while (id_existe);
+
+
+
+// Réallouer de la mémoire pour ajouter un docteur
+
+*docteurs = realloc(*docteurs, (*total + 1) * sizeof(Docteur));
+
+if (*docteurs == NULL) {
+
+printf("Erreur de réallocation mémoire.\n");
+
+exit(1); // Arrêter l'exécution en cas d'échec de réallocation
+
+}
+
+
+
+Docteur *nouveau = &(*docteurs)[*total];
+
+nouveau->ID = nouvel_ID;
+
+
+
+// Demander les informations du docteur
+
+printf("Saisir le nom : ");
+
+fgets(nouveau->nom, sizeof(nouveau->nom), stdin);
+
+printf("Saisir la spécialité : ");
+
+fgets(nouveau->specialite, sizeof(nouveau->specialite), stdin);
+
+printf("Saisir l'adresse : ");
+
+fgets(nouveau->adresse, sizeof(nouveau->adresse), stdin);
+
+valider_numero(nouveau->numero_telephone);
+
+
+
+// Enlever le caractère '\n' de la fin des chaînes saisies
+
+nouveau->nom[strcspn(nouveau->nom, "\n")] = '\0';
+
+nouveau->specialite[strcspn(nouveau->specialite, "\n")] = '\0';
+
+nouveau->adresse[strcspn(nouveau->adresse, "\n")] = '\0';
+
+
+
+// Incrémenter le total de docteurs
+
+(*total)++;
+
+Sauvegarder_docteurs(*docteurs, *total);
+
+}
+
+
+
+void Supprimer_docteur(Docteur **docteurs, int *total, int id) {
+
+for (int i = 0; i < *total; i++) {
+
+if ((*docteurs)[i].ID == id) {
+
+// Décalage des éléments après la suppression
+
+for (int j = i; j < *total - 1; j++) {
+
+(*docteurs)[j] = (*docteurs)[j + 1];
+
+}
+
+
+
+// Réallouer la mémoire pour réduire la taille du tableau
+
+*docteurs = realloc(*docteurs, (*total - 1) * sizeof(Docteur));
+
+if (*docteurs == NULL && *total - 1 > 0) {
+
+printf("Erreur de réallocation mémoire.\n");
+
+exit(1); // Arrêter l'exécution en cas d'échec de réallocation
+
+}
+
+
+
+(*total)--; // Réduire le total
+
+printf("Docteur supprimé.\n");
+
+Sauvegarder_docteurs(*docteurs, *total);
+
+return;
+
+}
+
+}
+
+printf("Aucun docteur avec cet ID.\n");
+
+}
+
+void Modifier_docteur(Docteur *docteurs, int total, int id) {
+
+int found = 0; // Variable pour vérifier si le docteur a été trouvé
+
+
+
+for (int i = 0; i < total; i++) {
+
+if (docteurs[i].ID == id) {
+
+found = 1; // Le docteur est trouvé, on effectue la modification
+
+
+
+// Demander les nouvelles informations
+
+printf("Saisir le nouveau nom : ");
+
+fgets(docteurs[i].nom, sizeof(docteurs[i].nom), stdin);
+
+docteurs[i].nom[strcspn(docteurs[i].nom, "\n")] = '\0'; // Enlever '\n'
+
+
+
+printf("Saisir la nouvelle spécialité : ");
+
+fgets(docteurs[i].specialite, sizeof(docteurs[i].specialite), stdin);
+
+docteurs[i].specialite[strcspn(docteurs[i].specialite, "\n")] = '\0'; // Enlever '\n'
+
+
+
+printf("Saisir la nouvelle adresse : ");
+
+fgets(docteurs[i].adresse, sizeof(docteurs[i].adresse), stdin);
+
+docteurs[i].adresse[strcspn(docteurs[i].adresse, "\n")] = '\0'; // Enlever '\n'
+
+
+
+printf("Saisir le nouveau numéro de téléphone : ");
+
+fgets(docteurs[i].numero_telephone, sizeof(docteurs[i].numero_telephone), stdin);
+
+docteurs[i].numero_telephone[strcspn(docteurs[i].numero_telephone, "\n")] = '\0'; // Enlever '\n'
+
+
+
+printf("Modification effectuée.\n");
+
+
+
+// Sauvegarder les docteurs après modification dans le fichier
+
+FILE *file = fopen(docteurs, "w");
+
+if (file == NULL) {
+
+printf("Erreur lors de l'ouverture du fichier.\n");
+
+return;
+
+}
+
+for (int j = 0; j < total; j++) {
+
+fprintf(file, "%d,%s,%s,%s,%s\n", docteurs[j].ID, docteurs[j].nom, docteurs[j].specialite, docteurs[j].adresse, docteurs[j].numero_telephone);
+
+}
+
+fclose(file);
+
+
+
+return;
+
+}
+
+}
+
+
+
+// Si aucun docteur avec cet ID n'est trouvé
+
+if (!found) {
+
+printf("Aucun docteur trouvé avec l'ID %d.\n", id);
+
+}
+
+}
+
+// Fonctions CRUD pour les patients
+
+void Ajouter_patient(Patient **patients, int *total) {
+
+// Réallouer de la mémoire pour ajouter un patient
+
+*patients = realloc(*patients, (*total + 1) * sizeof(Patient));
+
+if (*patients == NULL) {
+
+printf("Erreur de réallocation mémoire.\n");
+
+exit(1); // Arrêter l'exécution en cas d'échec de réallocation
+
+}
+
+
+
+Patient *nouveau = &(*patients)[*total];
+
+
+
+// Demander l'ID, le nom, l'âge et l'adresse
+
+nouveau->ID = valider_id();
+
+printf("Saisir le nom : ");
+
+fgets(nouveau->nom, sizeof(nouveau->nom), stdin);
+
+printf("Saisir l'âge : ");
+
+scanf("%d", &nouveau->age);
+
+getchar(); // Consommer le caractère de nouvelle ligne
+
+printf("Saisir l'adresse : ");
+
+fgets(nouveau->adresse, sizeof(nouveau->adresse), stdin);
+
+valider_numero(nouveau->numero_telephone);
+
+
+
+// Enlever le caractère '\n' à la fin des chaînes de caractères
+
+nouveau->nom[strcspn(nouveau->nom, "\n")] = '\0';
+
+nouveau->adresse[strcspn(nouveau->adresse, "\n")] = '\0';
+
+
+
+(*total)++;
+
+Sauvegarder_patients(*patients, *total);
+
+}
+
+
+
+void Modifier_patient(Patient *patients, int *total, int id) {
+
+int found = 0; // Variable pour vérifier si le patient a été trouvé
+
+
+
+for (int i = 0; i < *total; i++) {
+
+if (patients[i].ID == id) {
+
+found = 1; // Le patient est trouvé, on effectue la modification
+
+
+
+// Demander les nouvelles informations
+
+printf("Saisir le nouveau nom : ");
+
+fgets(patients[i].nom, sizeof(patients[i].nom), stdin);
+
+printf("Saisir le nouvel âge : ");
+
+scanf("%d", &patients[i].age);
+
+getchar(); // Consommer le caractère de nouvelle ligne
+
+printf("Saisir la nouvelle adresse : ");
+
+fgets(patients[i].adresse, sizeof(patients[i].adresse), stdin);
+
+printf("Saisir le nouveau numéro de téléphone : ");
+
+fgets(patients[i].numero_telephone, sizeof(patients[i].numero_telephone), stdin);
+
+
+
+// Enlever les retours à la ligne '\n' après chaque fgets
+
+patients[i].nom[strcspn(patients[i].nom, "\n")] = '\0';
+
+patients[i].adresse[strcspn(patients[i].adresse, "\n")] = '\0';
+
+patients[i].numero_telephone[strcspn(patients[i].numero_telephone, "\n")] = '\0';
+
+
+
+printf("Modification effectuée.\n");
+
+
+
+// Sauvegarder les patients après modification
+
+Sauvegarder_patients(patients, *total);
+
+return;
+
+}
+
+}
+
+
+
+// Si aucun patient avec cet ID n'est trouvé
+
+if (!found) {
+
+printf("Aucun patient trouvé avec l'ID %d.\n", id);
+
+}
+
+}
+
+
+
+
+
+void Modifier_rendezVous(RendezVous *head, int id) {
+
+RendezVous *current = head;
+
+while (current != NULL) {
+
+if (current->id == id) {
+
+// Demander la nouvelle date et heure
+
+printf("Saisir la nouvelle date (YYYY-MM-DD) : ");
+
+scanf("%10s", current->date);
+
+printf("Saisir la nouvelle heure (HH:MM) : ");
+
+scanf("%5s", current->heure);
+
+getchar(); // Consommer le caractère de nouvelle ligne
+
+
+
+printf("Rendez-vous modifié avec succès.\n");
+
+
+
+// Sauvegarder les rendez-vous après modification
+
+Sauvegarder_rendezvous(head);
+
+return;
+
+}
+
+current = current->next;
+
+}
+
+printf("Aucun rendez-vous avec cet ID.\n");
+
+}
+
+
+
+RendezVous* creerRendezVous(int id, Patient patient, Docteur docteur, const char *date, const char *heure) {
+
+RendezVous *nouveau = (RendezVous *)malloc(sizeof(RendezVous));
+
+if (nouveau == NULL) {
+
+printf("Erreur de création du rendez-vous.\n");
+
+exit(1);
+
+}
+
+nouveau->id = id;
+
+nouveau->patient = patient;
+
+nouveau->docteur = docteur;
+
+strcpy(nouveau->date, date);
+
+strcpy(nouveau->heure, heure);
+
+nouveau->next = NULL;
+
+return nouveau;
+
+}
+
+
+
+void ajouterRendezVous(RendezVous **head, RendezVous *nouveau) {
+
+if (*head == NULL) {
+
+*head = nouveau;
+
+} else {
+
+RendezVous *temp = *head;
+
+while (temp->next != NULL) {
+
+temp = temp->next;
+
+}
+
+temp->next = nouveau;
+
+}
+
+Sauvegarder_rendezvous(*head);
+
+printf("Rendez-vous ajouté avec succès.\n");
+
+}
+
+
+
+void afficherRendezVous(RendezVous *head) {
+
+FILE *fichier = fopen("rendezvous.txt", "r");
+
+if (fichier == NULL) {
+
+printf("Erreur d'ouverture du fichier.\n");
+
+return;
+
+}
+
+char ligne[256];
+
+while (fgets(ligne, sizeof(ligne), fichier)) {
+
+printf("%s", ligne);
+
+}
+
+fclose(fichier);
+
+}
+
+
+
+void supprimerRendezVous(RendezVous **head, int id) {
+
+RendezVous *temp = *head, *prev = NULL;
+
+while (temp != NULL && temp->id != id) {
+
+prev = temp;
+
+temp = temp->next;
+
+}
+
+if (temp == NULL) {
+
+printf("Rendez-vous avec ID %d introuvable.\n", id);
+
+return;
+
+}
+
+if (prev == NULL) {
+
+*head = temp->next;
+
+} else {
+
+prev->next = temp->next;
+
+}
+
+free(temp);
+
+Sauvegarder_rendezvous(*head);
+
+printf("Rendez-vous supprimé avec succès.\n");
+
+}
+
+void Supprimer_patient(Patient **patients, int *total, int id) {
+
+int found = 0; // Variable pour vérifier si le patient a été trouvé
+
+
+
+for (int i = 0; i < *total; i++) {
+
+if ((*patients)[i].ID == id) {
+
+found = 1; // Le patient est trouvé, on effectue la suppression
+
+
+
+// Décalage des éléments après la suppression
+
+for (int j = i; j < *total - 1; j++) {
+
+(*patients)[j] = (*patients)[j + 1];
+
+}
+
+
+
+// Réallouer la mémoire pour réduire la taille du tableau
+
+Patient *temp = realloc(*patients, (*total - 1) * sizeof(Patient));
+
+if (temp == NULL && *total - 1 > 0) {
+
+printf("Erreur de réallocation mémoire.\n");
+
+return; // Retourner sans effectuer de réallocation si l'erreur survient
+
+}
+
+
+
+// Mise à jour du pointeur patients seulement si la réallocation a réussi
+
+*patients = temp;
+
+
+
+(*total)--; // Réduire le total des patients
+
+printf("Patient supprimé.\n");
+
+
+
+// Sauvegarder les patients après suppression
+
+Sauvegarder_patients(*patients, *total);
+
+return;
+
+}
+
+}
+
+
+
+// Si aucun patient avec cet ID n'est trouvé
+
+if (!found) {
+
+printf("Aucun patient trouvé avec l'ID %d.\n", id);
+
+}
+
+}
+
+
+
+
+
+void Afficher_liste_patients(Patient *patients, int total) {
+
+if (patients == NULL || total == 0) {
+
+printf("Aucun patient à afficher.\n");
+
+return;
+
+}
+
+
+
+printf("Liste des patients :\n");
+
+for (int i = 0; i < total; i++) {
+
+printf("ID: %d\n", patients[i].ID);
+
+printf("Nom: %s\n", patients[i].nom);
+
+printf("Âge: %d\n", patients[i].age);
+
+printf("Adresse: %s\n", patients[i].adresse);
+
+printf("Numéro de téléphone: %s\n", patients[i].numero_telephone);
+
+printf("---------------------------\n");
+
+}
+
+}
+
+
+
+void Afficher_liste_docteurs(Docteur *docteurs, int total) {
+
+if (docteurs == NULL || total == 0) {
+
+printf("Aucun docteur à afficher.\n");
+
+return;
+
+}
+
+
+
+printf("Liste des docteurs :\n");
+
+for (int i = 0; i < total; i++) {
+
+printf("ID: %d\n", docteurs[i].ID);
+
+printf("Nom: %s\n", docteurs[i].nom);
+
+printf("Spécialité: %s\n", docteurs[i].specialite);
+
+printf("Adresse: %s\n", docteurs[i].adresse);
+
+printf("Numéro de téléphone: %s\n", docteurs[i].numero_telephone);
+
+printf("---------------------------\n");
+
+}
+
+}
+
+void afficherMenu() {
+
+printf("\n=== MENU ===\n");
+
+printf("1. Ajouter un docteur\n");
+
+printf("2. Ajouter un patient\n");
+
+printf("3. Ajouter un rendez-vous\n");
+
+printf("4. Afficher les docteurs\n");
+
+printf("5. Afficher les patients\n");
+
+printf("6. Afficher les rendez-vous\n");
+
+printf("7. Modifier un docteur\n");
+
+printf("8. Modifier un patient\n");
+
+printf("9. Modifier un rendez-vous\n");
+
+printf("10. Supprimer un docteur\n");
+
+printf("11. Supprimer un patient\n");
+
+printf("12. Supprimer un rendez-vous\n");
+
+printf("0. Quitter\n");
+
+printf("=====================\n");
+
+printf("Votre choix : ");
+
+}
+
+
+
+int main() {
+
+Docteur *docteurs = NULL;
+
+Patient *patients = NULL;
+
+RendezVous *rendezVous = NULL;
+
+int totalDocteurs = 0, totalPatients = 0, totalRendezVous=0,choix;
+const char *fichier_docteurs = "docteurs.txt";
+    const char *fichier_patients = "patients.txt";
+    const char *fichier_rendezvous = "rendervous.txt";
+
+    Charger_docteurs(&docteurs, &totalDocteurs, fichier_docteurs);
+    Charger_patients(&patients, &totalPatients, fichier_patients);
+    Charger_rendezVous(&rendezVous, &totalRendezVous, fichier_rendezvous);
+
+while (1) {
+
+afficherMenu();
+
+scanf("%d", &choix);
+
+getchar(); // Absorber le retour à la ligne
+
+
+
+switch (choix) {
+
+case 1:
+
+Ajouter_docteur(&docteurs, &totalDocteurs);
+
+break;
+
+case 2:
+
+Ajouter_patient(&patients, &totalPatients);
+
+break;
+
+case 3:
+
+{
+
+int idPatient, idDocteur;
+
+char date[11], heure[6];
+
+printf("Saisir l'ID du patient : ");
+
+scanf("%d", &idPatient);
+
+getchar();
+
+printf("Saisir l'ID du docteur : ");
+
+scanf("%d", &idDocteur);
+
+getchar();
+
+do {
+
+printf("Saisir la date du rendez-vous (YYYY-MM-DD) : ");
+
+scanf("%10s", date);
+
+if (!valider_date(date)) {
+
+printf("Date invalide, réessayez.\n");
+
+}
+
+} while (!valider_date(date));
+
+do {
+
+printf("Saisir l'heure du rendez-vous (HH:MM) : ");
+
+scanf("%5s", heure);
+
+if (!valider_heure(heure)) {
+
+printf("Heure invalide, réessayez.\n");
+
+}
+
+} while (!valider_heure(heure));
+
+
+
+// Vérification de l'existence du patient et du docteur par leurs ID
+
+Patient *patient = NULL;
+
+Docteur *docteur = NULL;
+
+
+
+for (int i = 0; i < totalPatients; i++) {
+
+if (patients[i].ID == idPatient) {
+
+patient = &patients[i];
+
+break;
+
+}
+
+}
+
+for (int i = 0; i < totalDocteurs; i++) {
+
+if (docteurs[i].ID == idDocteur) {
+
+docteur = &docteurs[i];
+
+break;
+
+}
+
+}
+
+
+
+if (patient && docteur) {
+
+// Créer le rendez-vous
+
+RendezVous *rendezVousTmp = creerRendezVous(rendezVous ? rendezVous->id + 1 : 1, *patient, *docteur, date, heure);
+
+ajouterRendezVous(&rendezVous, rendezVousTmp);
+
+} else {
+
+printf("Patient ou docteur introuvable.\n");
+
+}
+
+}
+
+break;
+
+case 4:
+
+Afficher_liste_docteurs(docteurs, totalDocteurs);
+
+break;
+
+case 5:
+
+Afficher_liste_patients(patients, totalPatients);
+
+break;
+
+case 6:
+
+afficherRendezVous(rendezVous);
+
+break;
+
+case 7:
+
+{
+
+int id;
+
+printf("Saisir l'ID du docteur à modifier : ");
+
+scanf("%d", &id);
+
+Modifier_docteur(docteurs, totalDocteurs, id);
+
+}
+
+break;
+
+case 8:
+
+{
+
+int id;
+
+printf("Saisir l'ID du patient à modifier : ");
+
+scanf("%d", &id);
+
+Modifier_patient(patients, totalPatients, id);
+
+}
+
+break;
+
+case 9:
+
+{
+
+int id;
+
+printf("Saisir l'ID du rendez-vous à modifier : ");
+
+scanf("%d", &id);
+
+Modifier_rendezVous(rendezVous, id);
+
+}
+
+break;
+
+case 10:
+
+{
+
+int id;
+
+printf("Saisir l'ID du docteur à supprimer : ");
+
+scanf("%d", &id);
+
+Supprimer_docteur(&docteurs, &totalDocteurs, id);
+
+}
+
+break;
+
+case 11:
+
+{
+
+int id;
+
+printf("Saisir l'ID du patient à supprimer : ");
+
+scanf("%d", &id);
+
+Supprimer_patient(&patients, &totalPatients, id);
+
+}
+
+break;
+
+case 12:
+
+{
+
+int id;
+
+printf("Saisir l'ID du rendez-vous à supprimer : ");
+
+scanf("%d", &id);
+
+supprimerRendezVous(&rendezVous, id);
+
+}
+
+break;
+
+case 0:
+
+// Sauvegarder les données avant de quitter
+
+Sauvegarder_docteurs(docteurs, totalDocteurs);
+
+Sauvegarder_patients(patients, totalPatients);
+
+Sauvegarder_rendezvous(rendezVous);
+
+
+
+// Libérer la mémoire
+
+free(docteurs);
+
+free(patients);
+
+RendezVous *tmp;
+
+while (rendezVous != NULL) {
+
+tmp = rendezVous;
+
+rendezVous = rendezVous->next;
+
+free(tmp);
+
+}
+
+
+
+printf("Au revoir !\n");
+
+return 0;
+
+default:
+
+printf("Choix invalide. Veuillez réessayer.\n");
+
+}
+
+} }
